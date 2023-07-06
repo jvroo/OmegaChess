@@ -60,9 +60,13 @@ Move NegaMax::killer_moves[][MAX_PLY];
 int NegaMax::history_moves[][MAX_PLY];
 int NegaMax::PV_length[];
 Move NegaMax::PV_table[][MAX_PLY];
+bool NegaMax::following_PV_{false};
+bool NegaMax::evaluate_PV_{false};
 
 int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth)
 {
+    //Define Found Principle Value Node Variable
+    auto found_pv = false;
     //Init the principle value length
     PV_length[ply_] = ply_;
     //Exit recursive loop with evaluation of position
@@ -86,6 +90,10 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
     //Generate empty movelist and populate for current boardstate
     auto move_list = MoveList{};
     board_state->generate_moves(move_list);
+    //Find principle variation
+    if (following_PV_) {
+        enable_PV_scoring(move_list);
+    }
     //Order moves to increase alpha beta pruning speed
     Search::sort_moves(board_state, move_list);
     //Loop over moves in move list
@@ -107,8 +115,19 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
         }
         //Increment legal moves
         legal_moves++;
-        //Iterate to next node in tree
-        int score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
+        //Initialize the score
+        int score = 0;
+        //Find principle value using enhanced search
+        if (found_pv) {
+            score = -NegaMax::find_best_move(board_state, -alpha - 1, -alpha, depth - 1);
+            if ((score > alpha) && (score < beta)) {
+                score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
+            }
+        }
+        else{
+            //Iterate to next node in tree
+            score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
+        }
         //Restore state
         ply_--;
         board_state->restore_copy(copy_of_state);
@@ -134,6 +153,8 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
             }
             //Set new alpha
             alpha = score;
+            //Set Found Principle Value
+            found_pv = true;
             //Write PV move to PV table
             PV_table[ply_][ply_] = move;
             for (int next_ply = ply_ + 1; next_ply < PV_length[ply_+1]; next_ply++)
@@ -220,14 +241,23 @@ int NegaMax::quiescence_search(std::shared_ptr<Boardstate> board_state, int alph
 int NegaMax::nega_search(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth)
 {
     //Reset all data used in search
-    reset_nodes();
+    //reset_nodes();
     reset_ply();
-    memset(killer_moves, 0, sizeof(killer_moves));
-    memset(history_moves, 0, sizeof(history_moves));
-    memset(PV_table, 0, sizeof(PV_table));
-    memset(PV_length, 0, sizeof(PV_length));
+    enable_following_PV();
     //Find best move
     return find_best_move(board_state, alpha, beta, depth);
+}
+
+void NegaMax::enable_PV_scoring(MoveList move_list){
+      disable_following_PV();
+      for (auto iCount = 0; iCount < move_list.get_num_moves(); iCount++) {
+        auto pv_move = PV_table[0][ply_];
+        auto current_move = move_list.get_move(iCount);
+        if (pv_move == current_move) {
+            enable_evaluate_PV();
+            enable_following_PV();
+        }
+      }
 }
 
 constexpr auto BEST_MOVE_INDEX = 0;
@@ -244,6 +274,36 @@ void NegaMax::reset_nodes()
 void NegaMax::reset_ply()
 {
     ply_ = 0;
+}
+
+void NegaMax::disable_following_PV()
+{
+    following_PV_ = false;
+}
+
+void NegaMax::enable_following_PV()
+{
+    following_PV_ = true;
+}
+
+void NegaMax::disable_evaluate_PV()
+{
+    evaluate_PV_ = false;
+}
+
+void NegaMax::enable_evaluate_PV()
+{
+    evaluate_PV_ = true;
+}
+
+bool NegaMax::get_following_PV()
+{
+    return following_PV_;
+}
+
+bool NegaMax::get_evaluate_PV()
+{
+    return evaluate_PV_;
 }
 
 int NegaMax::get_ply()
@@ -274,6 +334,13 @@ std::string Search::search_position(std::shared_ptr<Boardstate> board_state, int
         return move_string;
     case (NegaMaxSearch):
         //implementing iterative deepening
+        NegaMax::disable_following_PV();
+        NegaMax::disable_evaluate_PV();
+        //Clear Move lists
+        memset(NegaMax::killer_moves, 0, sizeof(NegaMax::killer_moves));
+        memset(NegaMax::history_moves, 0, sizeof(NegaMax::history_moves));
+        memset(NegaMax::PV_table, 0, sizeof(NegaMax::PV_table));
+        memset(NegaMax::PV_length, 0, sizeof(NegaMax::PV_length));
         for (auto current_depth = 1; current_depth <= depth; current_depth++)
         {
             score = NegaMax::nega_search(board_state, MINIMUM_SCORE, MAXIMIM_SCORE, current_depth);

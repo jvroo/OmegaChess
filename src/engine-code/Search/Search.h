@@ -32,6 +32,12 @@
     static int nega_search(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth);
     static void reset_nodes();
     static void reset_ply();
+    static void disable_following_PV();
+    static void enable_following_PV();
+    static void disable_evaluate_PV();
+    static void enable_evaluate_PV();
+    static bool get_following_PV();
+    static bool get_evaluate_PV();
     static int get_ply();
     static long long get_nodes();
     static Move get_best_move();
@@ -68,7 +74,12 @@
     static int find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth);
     static long long nodes_;
     static int ply_;
+    static bool following_PV_;
+    static bool evaluate_PV_;
+    static bool found_PV_;
     //static Move best_move;
+    //Enable PV move scoring
+    static void enable_PV_scoring(MoveList move_list);
  };
 
  //Expand types of search as needed

@@ -44,6 +44,7 @@ int BasicEval::evaluate(std::shared_ptr<Boardstate> board_state)
 }
 
 #include "../Search/Search.h"
+constexpr int PV_BASE_SCORE = 20000;
 constexpr int CAPTURE_MOVE_BASE_SCORE = 10000;
 constexpr int FIRST_KILLER_MOVE_SCORE = 9000;
 constexpr int SECOND_KILLER_MOVE_SCORE = 8000;
@@ -52,6 +53,14 @@ constexpr int SECOND_KILLER_MOVE_INDEX = 1;
 
 int BasicEval::score_move(std::shared_ptr<Boardstate> board_state, Move move)
 {
+    //Score Principle Variation Higher
+    if (NegaMax::get_evaluate_PV()) {
+        auto pv_move = NegaMax::PV_table[0][NegaMax::get_ply()];
+        if (pv_move == move) {
+            NegaMax::disable_evaluate_PV();
+            return PV_BASE_SCORE;
+        }
+    }
     //For capture move scoring
     if (move.get_move_capture_flag())
     {
