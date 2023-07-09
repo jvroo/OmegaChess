@@ -99,6 +99,7 @@ public:
     void print_moves(MoveList &move_list);
     void FEN_parse(std::string fen);
     void set_side_to_move(bool sideToMove);
+    void set_en_passant_square(int square);
     void generate_moves(MoveList &move_list);
     bool make_move(Move &move, bool move_type);
     void operator=(Boardstate& oldBoardState);

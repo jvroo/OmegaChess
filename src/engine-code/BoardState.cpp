@@ -500,6 +500,11 @@ int Boardstate::get_en_passant_square()
     return en_passant_square_;
 }
 
+void Boardstate::set_en_passant_square(int square)
+{
+    en_passant_square_ = square;
+}
+
 int Boardstate::get_castling_rights()
 {
     return castling_rights_;

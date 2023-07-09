@@ -76,10 +76,11 @@
     static int ply_;
     static bool following_PV_;
     static bool evaluate_PV_;
-    static bool found_PV_;
     //static Move best_move;
     //Enable PV move scoring
     static void enable_PV_scoring(MoveList move_list);
+    static int reduction_limit;
+    static int full_depth_moves;
  };
 
  //Expand types of search as needed

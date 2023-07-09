@@ -50,7 +50,7 @@ int main ()
 
 
     auto board = std::make_shared<Boardstate>();
-    board->FEN_parse(cmk_position);
+    board->FEN_parse(tricky_position);
 
     bool debug = true;
 
@@ -61,7 +61,7 @@ int main ()
         MoveList moves;
         board->generate_moves(moves);
         //moves.print_move_list();
-        Search::search_position(board,7,NegaMaxSearch);
+        Search::search_position(board,9,NegaMaxSearch);
         //NegaMax::PV_table[0][NegaMax::get_ply()].print_move_UCI();
         //NegaMax::killer_moves[0][NegaMax::get_ply()] = moves.get_move(3);
         //NegaMax::killer_moves[1][NegaMax::get_ply()] = moves.get_move(2);

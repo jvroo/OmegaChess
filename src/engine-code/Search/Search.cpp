@@ -48,10 +48,13 @@ constexpr auto SIDE_TO_MOVE_SHIFT = 1;
 
 constexpr auto MAXIMIM_SCORE = 50000;
 constexpr auto MINIMUM_SCORE = -50000;
+constexpr auto ASPIRATION_WINDOW_SCORE = 50;
 constexpr auto CHECK_MATE_SCORE = 49000;
 constexpr auto DRAW_SCORE = 0;
 constexpr int FIRST_KILLER_MOVE_INDEX = 0;
 constexpr int SECOND_KILLER_MOVE_INDEX = 1;
+constexpr int NULL_MOVE_PRUNING_DEPTH = 3;
+constexpr int REDUCTION_LIMIT = 2;
 
 long long NegaMax::nodes_{0};
 int NegaMax::ply_{0};
@@ -62,11 +65,11 @@ int NegaMax::PV_length[];
 Move NegaMax::PV_table[][MAX_PLY];
 bool NegaMax::following_PV_{false};
 bool NegaMax::evaluate_PV_{false};
+int NegaMax::reduction_limit{3};
+int NegaMax::full_depth_moves{4};
 
 int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth)
 {
-    //Define Found Principle Value Node Variable
-    auto found_pv = false;
     //Init the principle value length
     PV_length[ply_] = ply_;
     //Exit recursive loop with evaluation of position
@@ -87,6 +90,19 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
     if (is_king_in_check) depth++;
     //Init legal move counter
     auto legal_moves = 0;
+    //Null move pruning
+    if ((depth >= NULL_MOVE_PRUNING_DEPTH) && (is_king_in_check == false) && (ply_ >= 1)) {
+        //Make copy of state
+        auto copy_of_null_state = BoardstateCopy{};
+        board_state->make_copy(copy_of_null_state);
+        board_state->set_side_to_move(!board_state->get_side_to_move());
+        board_state->set_en_passant_square(no_sq);
+        auto score = -NegaMax::find_best_move(board_state, -beta, -beta + 1, depth - 1 - REDUCTION_LIMIT);
+        board_state->restore_copy(copy_of_null_state);
+        if (score >= beta) {
+            return beta;
+        }
+    }
     //Generate empty movelist and populate for current boardstate
     auto move_list = MoveList{};
     board_state->generate_moves(move_list);
@@ -96,6 +112,8 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
     }
     //Order moves to increase alpha beta pruning speed
     Search::sort_moves(board_state, move_list);
+    //Number of moves searched
+    auto moves_searched = 0;
     //Loop over moves in move list
     for (auto iCount = 0; iCount < move_list.get_num_moves(); iCount++)
     {
@@ -118,19 +136,33 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
         //Initialize the score
         int score = 0;
         //Find principle value using enhanced search
-        if (found_pv) {
-            score = -NegaMax::find_best_move(board_state, -alpha - 1, -alpha, depth - 1);
-            if ((score > alpha) && (score < beta)) {
-                score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
-            }
-        }
-        else{
+        if (moves_searched == 0) {
             //Iterate to next node in tree
             score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
+        }
+        else {
+            if ((moves_searched >= full_depth_moves) &&
+                (depth >= reduction_limit) &&
+                (is_king_in_check == false) &&
+                (move.get_move_capture_flag() == false) &&
+                (move.get_move_promotion_type() == 0)) {
+                score = -NegaMax::find_best_move(board_state, -alpha - 1, -alpha, depth - 2);
+            }
+            else {
+                score = alpha + 1;
+            }
+            if (score > alpha) {
+                score = -NegaMax::find_best_move(board_state, -alpha - 1, -alpha, depth - 1);
+                if ((score > alpha) && (score < beta)) {
+                    score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
+                }
+            }             
         }
         //Restore state
         ply_--;
         board_state->restore_copy(copy_of_state);
+        //Increment moves searched
+        moves_searched++;
         //Using Fail - Hard framework
         if (score >= beta)
         {
@@ -153,8 +185,6 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
             }
             //Set new alpha
             alpha = score;
-            //Set Found Principle Value
-            found_pv = true;
             //Write PV move to PV table
             PV_table[ply_][ply_] = move;
             for (int next_ply = ply_ + 1; next_ply < PV_length[ply_+1]; next_ply++)
@@ -324,6 +354,8 @@ std::string Search::search_position(std::shared_ptr<Boardstate> board_state, int
 {
     auto score = 0;
     std::string move_string = "";
+    auto alpha = MINIMUM_SCORE;
+    auto beta = MAXIMIM_SCORE;
     //Add searches as needed
     switch (search_type)
     {
@@ -341,9 +373,16 @@ std::string Search::search_position(std::shared_ptr<Boardstate> board_state, int
         memset(NegaMax::history_moves, 0, sizeof(NegaMax::history_moves));
         memset(NegaMax::PV_table, 0, sizeof(NegaMax::PV_table));
         memset(NegaMax::PV_length, 0, sizeof(NegaMax::PV_length));
-        for (auto current_depth = 1; current_depth <= depth; current_depth++)
+        for (int current_depth = 1; current_depth <= depth; current_depth++)
         {
-            score = NegaMax::nega_search(board_state, MINIMUM_SCORE, MAXIMIM_SCORE, current_depth);
+            score = NegaMax::nega_search(board_state, alpha, beta, current_depth);
+            if ((score <= alpha) || (score >= beta)) {
+                alpha = MINIMUM_SCORE;
+                beta = MAXIMIM_SCORE;
+                continue;
+            }
+            alpha = score - ASPIRATION_WINDOW_SCORE;
+            beta = score + ASPIRATION_WINDOW_SCORE;
             UCI_Link::set_search_info(score,current_depth,NegaMax::get_nodes());
             UCI_Link::print_search_info(NegaMaxSearch);
         }
