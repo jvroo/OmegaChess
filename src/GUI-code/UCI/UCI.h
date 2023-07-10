@@ -23,7 +23,7 @@ public:
     void UCI_loop();
     Move parse_move(std::string move_string);
     void parse_position(std::string command);
-    void parse_go(std::string command);
+    void parse_go(char* command);
     void set_board_state(const ptr_board board_state);
     static void set_search_info(int score, int depth,int nodes);
     static void print_search_info(int search_type);

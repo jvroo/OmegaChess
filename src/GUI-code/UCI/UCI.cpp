@@ -229,46 +229,96 @@ void UCI_Link::parse_position(std::string command)
 }
 
 constexpr auto NO_DEPTH = -1;
-constexpr auto GO_STRING = "go";
-constexpr auto DEPTH_STRING = "depth";
+constexpr auto NO_TIME = -1;
+constexpr auto MAX_DEPTH = 99;
+constexpr char* GO_STRING = "go";
+constexpr char* DEPTH_STRING = "depth";
+constexpr char* INFINITE_SEARCH = "infinite";
+constexpr char* BINC = "binc";
+constexpr char* WINC = "winc";
+constexpr char* WTIME = "wtime";
+constexpr char* BTIME = "btime";
+constexpr char* MOVES_TO_GO = "movestogo";
+constexpr char* MOVE_TIME = "movetime";
 constexpr auto PLACEHOLDER_DEPTH = 5;
 
-void UCI_Link::parse_go(std::string command)
+void UCI_Link::parse_go(char* command)
 {
     auto depth = NO_DEPTH;
-    std::istringstream command_string_stream(command);
-    std::string go_string = "";
-    if (!command_string_stream)
+    //ADAPTED FOLLOWING UCI GO PARSING FROM CODE MONKEY KING
+    //Initialize argument variable
+    char *argument = NULL;
+    bool side = board_state_->get_side_to_move();
+    //Infinite Search
+    if ((argument = strstr(command,INFINITE_SEARCH)))
     {
-        std::cout << INVALD_UCI_COMMAND << std::endl;
-        return;
+        depth = NO_DEPTH;
     }
-    command_string_stream >> go_string;
-    if (go_string != GO_STRING)
+    //UCI "binc" command
+    if ((argument = strstr(command,BINC)) && side == black)
+        // parse black time increment
+        NegaMax::gameTimer.inc = atoi(argument + 5);
+
+    //UCI "winc" command
+    if ((argument = strstr(command,WINC)) && side == white)
+        // parse white time increment
+        NegaMax::gameTimer.inc = atoi(argument + 5);
+
+    //UCI "wtime" command
+    if ((argument = strstr(command,WTIME)) && side == white)
+        // parse white time limit
+        NegaMax::gameTimer.time = atoi(argument + 6);
+
+    //UCI "btime" command
+    if ((argument = strstr(command,BTIME)) && side == black)
+        // parse black time limit
+        NegaMax::gameTimer.time = atoi(argument + 6);
+
+    //UCI "movestogo" command
+    if ((argument = strstr(command,MOVES_TO_GO)))
+        // parse number of moves to go
+        NegaMax::gameTimer.movestogo = atoi(argument + 10);
+
+    //UCI "movetime" command
+    if ((argument = strstr(command,MOVE_TIME)))
+        // parse amount of time allowed to spend to make a move
+        NegaMax::gameTimer.movetime = atoi(argument + 9);
+
+    //UCI "depth" command
+    if ((argument = strstr(command,DEPTH_STRING)))
+        // parse search depth
+        depth = atoi(argument + 6);
+
+    //No move time available
+    if(NegaMax::gameTimer.movetime != NO_TIME)
     {
-        std::cout << INVALD_UCI_COMMAND << std::endl;
-        return;
+        NegaMax::gameTimer.time = NegaMax::gameTimer.movetime;
+        NegaMax::gameTimer.movestogo = 1;
     }
-    std::string depth_string = "";
-    if (!command_string_stream)
+
+    // init start time
+    NegaMax::gameTimer.starttime = NegaMax::gameTimer.get_time_ms();
+
+    // if time control is available
+    if(NegaMax::gameTimer.time != -1)
     {
-        std::cout << INVALD_UCI_COMMAND << std::endl;
-        return;
-    }
-    command_string_stream >> depth_string;
-    if (depth_string.find(DEPTH_STRING) == NO_MOVE)
-    {
-        depth = PLACEHOLDER_DEPTH;
+        // flag we're playing with time control
+        NegaMax::gameTimer.timeset = 1;
+
+        // set up timing
+        NegaMax::gameTimer.time /= NegaMax::gameTimer.movestogo;
+        NegaMax::gameTimer.time -= 50;
+        NegaMax::gameTimer.stoptime = NegaMax::gameTimer.starttime + NegaMax::gameTimer.time + NegaMax::gameTimer.inc;
     }
     else
     {
-        depth_string = "";
-        command_string_stream >> depth_string;
-        depth = stoi(depth_string);
+        NegaMax::gameTimer.stoptime = NegaMax::gameTimer.get_time_ms() + NegaMax::gameTimer.movetime;;
     }
-    //CHANGE AS NEEDED
+    if(depth == NO_DEPTH) {
+        depth = MAX_DEPTH;
+    }
     std::string best_move = Search::search_position(board_state_,depth,NegaMaxSearch);
-    UCI_Link::print_search_info(NegaMaxSearch);
+    //UCI_Link::print_search_info(NegaMaxSearch);
     std::cout << "bestmove " << best_move << std::endl;
 }
 

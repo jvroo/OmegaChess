@@ -17,6 +17,7 @@
 #include "Move.h"
 
 #include "../GUI-code/UCI/UCI.h"
+#include "../GUI-code/UCI/UCITimer.h"
 
 #include "Evaluation/BasicEval.h"
 
@@ -52,7 +53,7 @@ int main ()
     auto board = std::make_shared<Boardstate>();
     board->FEN_parse(tricky_position);
 
-    bool debug = true;
+    bool debug = false;
 
     if (debug)
     {
@@ -61,7 +62,7 @@ int main ()
         MoveList moves;
         board->generate_moves(moves);
         //moves.print_move_list();
-        Search::search_position(board,9,NegaMaxSearch);
+        Search::search_position(board,6,NegaMaxSearch);
         //NegaMax::PV_table[0][NegaMax::get_ply()].print_move_UCI();
         //NegaMax::killer_moves[0][NegaMax::get_ply()] = moves.get_move(3);
         //NegaMax::killer_moves[1][NegaMax::get_ply()] = moves.get_move(2);
@@ -71,6 +72,8 @@ int main ()
         //Search::sort_moves(board,moves);
         std::cout << "\n\n";
         //BasicEval::print_move_score(board, moves);
+        auto test = UCITimer{};
+
     }
     else
     {

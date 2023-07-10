@@ -55,6 +55,7 @@ constexpr int FIRST_KILLER_MOVE_INDEX = 0;
 constexpr int SECOND_KILLER_MOVE_INDEX = 1;
 constexpr int NULL_MOVE_PRUNING_DEPTH = 3;
 constexpr int REDUCTION_LIMIT = 2;
+constexpr int NODE_POLL_FREQ = 2047;
 
 long long NegaMax::nodes_{0};
 int NegaMax::ply_{0};
@@ -67,9 +68,15 @@ bool NegaMax::following_PV_{false};
 bool NegaMax::evaluate_PV_{false};
 int NegaMax::reduction_limit{3};
 int NegaMax::full_depth_moves{4};
+UCITimer NegaMax::gameTimer{};
 
 int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth)
 {
+    //Quick stop as needed
+    if((nodes_ & NODE_POLL_FREQ ) == 0) {
+        // "listen" to the GUI/user input
+		gameTimer.communicate();
+    }
     //Init the principle value length
     PV_length[ply_] = ply_;
     //Exit recursive loop with evaluation of position
@@ -156,11 +163,14 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
                 if ((score > alpha) && (score < beta)) {
                     score = -NegaMax::find_best_move(board_state, -beta, -alpha, depth - 1);
                 }
-            }             
+            }
         }
         //Restore state
         ply_--;
         board_state->restore_copy(copy_of_state);
+        if (gameTimer.get_stopped()) {
+            return score;
+        }
         //Increment moves searched
         moves_searched++;
         //Using Fail - Hard framework
@@ -213,6 +223,11 @@ int NegaMax::find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, 
 //Searches captures only until quiet position with no more captures
 int NegaMax::quiescence_search(std::shared_ptr<Boardstate> board_state, int alpha, int beta)
 {
+    //Quick stop as needed
+    if((nodes_ & NODE_POLL_FREQ ) == 0) {
+        // "listen" to the GUI/user input
+		gameTimer.communicate();
+    }
     //Increments nodes
     nodes_++;
     //Find position evaluation
@@ -356,6 +371,7 @@ std::string Search::search_position(std::shared_ptr<Boardstate> board_state, int
     std::string move_string = "";
     auto alpha = MINIMUM_SCORE;
     auto beta = MAXIMIM_SCORE;
+    NegaMax::gameTimer.set_stopped(false);
     //Add searches as needed
     switch (search_type)
     {
@@ -375,6 +391,9 @@ std::string Search::search_position(std::shared_ptr<Boardstate> board_state, int
         memset(NegaMax::PV_length, 0, sizeof(NegaMax::PV_length));
         for (int current_depth = 1; current_depth <= depth; current_depth++)
         {
+            if (NegaMax::gameTimer.get_stopped()) {
+                break;
+            }
             score = NegaMax::nega_search(board_state, alpha, beta, current_depth);
             if ((score <= alpha) || (score >= beta)) {
                 alpha = MINIMUM_SCORE;

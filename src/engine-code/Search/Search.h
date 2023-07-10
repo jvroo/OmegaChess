@@ -7,6 +7,7 @@
 #include "../BoardState.h"
 #include "../Evaluation/BasicEval.h"
 #include "../../GUI-code/UCI/UCI.h"
+#include "../../GUI-code/UCI/UCITimer.h"
 
 /** \file Search.h
     \brief Contains various search algorithms
@@ -69,6 +70,7 @@
     */
     static int PV_length[MAX_PLY];
     static Move PV_table[MAX_PLY][MAX_PLY];
+    static UCITimer gameTimer;
  private:
     static int quiescence_search(std::shared_ptr<Boardstate> board_state, int alpha, int beta);
     static int find_best_move(std::shared_ptr<Boardstate> board_state, int alpha, int beta, int depth);
