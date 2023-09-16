@@ -1,2 +1,2 @@
 # OmegaChess
-A self learning chess engine
+A bitboard chess engine with static evaluation tables. 
